@@ -19,4 +19,5 @@ ENTRYPOINT [ "/sbin/tini", "--" ]
 CMD [ "node", "./main.js" ]
 
 COPY main.js .
+COPY .env .
 COPY --from=production_dependencies node_modules node_modules

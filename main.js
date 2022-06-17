@@ -8,6 +8,7 @@ const {
   Intents,
   MessageActionRow,
   MessageButton,
+  Permissions,
 } = require("discord.js");
 const dayjs = require("dayjs");
 
@@ -111,7 +112,7 @@ client.on("messageCreate", async message => {
 client.on("interactionCreate", async interaction => {
   if (!interaction.isButton()) return;
 
-  const user = interaction.user;
+  const { user, member } = interaction;
 
   if (
     interaction.customId === "close-support-thread" &&
@@ -120,7 +121,11 @@ client.on("interactionCreate", async interaction => {
     const starterMessage = await interaction.channel.fetchStarterMessage();
     const ownerId = starterMessage.author.id;
 
-    if (ownerId !== user.id) {
+    const hasPermissionToClose =
+      ownerId === user.id ||
+      member.permissions.has(Permissions.FLAGS.MANAGE_THREADS);
+
+    if (!hasPermissionToClose) {
       await interaction.reply({
         content: "Nie jesteś właścicielem tego wątku!",
         ephemeral: true,

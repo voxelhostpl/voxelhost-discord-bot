@@ -15,7 +15,7 @@ const dayjs = require("dayjs");
 const { CLIENT_ID, TOKEN, SUGGESTIONS_CHANNEL_ID, HELP_CHANNEL_ID } =
   process.env;
 
-const rest = new REST({ version: "9" }).setToken(TOKEN);
+const rest = new REST().setToken(TOKEN);
 const client = new Client({
   intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES],
 });
@@ -40,21 +40,6 @@ rest.put(Routes.applicationCommands(CLIENT_ID), {
 
 client.once("ready", () => {
   console.log("Ready!");
-});
-
-client.on("interactionCreate", async interaction => {
-  if (!interaction.isCommand()) return;
-
-  if (interaction.commandName === "slowmode") {
-    const delay = interaction.options.getInteger("delay") ?? 0;
-
-    await interaction.channel.setRateLimitPerUser(delay);
-
-    await interaction.reply({
-      content: `Set slowmode to ${delay} seconds`,
-      ephemeral: true,
-    });
-  }
 });
 
 client.on("messageCreate", async message => {
@@ -110,14 +95,24 @@ client.on("messageCreate", async message => {
 });
 
 client.on("interactionCreate", async interaction => {
-  if (!interaction.isButton()) return;
+  if (interaction.isCommand() && interaction.commandName === "slowmode") {
+    const delay = interaction.options.getInteger("delay") ?? 0;
 
-  const { user, member } = interaction;
+    await interaction.channel.setRateLimitPerUser(delay);
+
+    await interaction.reply({
+      content: `Set slowmode to ${delay} seconds`,
+      ephemeral: true,
+    });
+  }
 
   if (
+    interaction.isButton() &&
     interaction.customId === "close-support-thread" &&
     interaction.channel.isThread()
   ) {
+    const { user, member } = interaction;
+
     const starterMessage = await interaction.channel.fetchStarterMessage();
     const ownerId = starterMessage.author.id;
 

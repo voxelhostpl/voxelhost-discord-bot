@@ -11,9 +11,24 @@ const {
   Permissions,
 } = require("discord.js");
 const dayjs = require("dayjs");
+const express = require("express");
+const bodyParser = require("body-parser");
+const sqlite = require("sqlite3");
 
-const { CLIENT_ID, TOKEN, SUGGESTIONS_CHANNEL_ID, HELP_CHANNEL_ID } =
-  process.env;
+const DB = new sqlite.Database("./database.db");
+DB.run(`CREATE TABLE IF NOT EXISTS customers (
+  discordId VARCHAR(18) PRIMARY KEY
+)`);
+
+const {
+  CLIENT_ID,
+  TOKEN,
+  SUGGESTIONS_CHANNEL_ID,
+  HELP_CHANNEL_ID,
+  API_PORT,
+  GUILD_ID,
+  CUSTOMER_ROLE_ID,
+} = process.env;
 
 const rest = new REST().setToken(TOKEN);
 const client = new Client({
@@ -137,3 +152,40 @@ client.on("interactionCreate", async interaction => {
 });
 
 client.login(TOKEN);
+
+const addRole = async userId => {
+  const guild = await client.guilds.fetch(GUILD_ID);
+  const member = await guild.members.fetch(userId);
+
+  if (!member) {
+    return;
+  }
+
+  await member.roles.add(CUSTOMER_ROLE_ID);
+};
+
+const removeRole = async userId => {
+  const guild = await client.guilds.fetch(GUILD_ID);
+  const member = await guild.members.fetch(userId);
+
+  if (!member) {
+    return;
+  }
+
+  await member.roles.remove(CUSTOMER_ROLE_ID);
+};
+
+const app = express();
+app.use(bodyParser.json());
+
+app.post("/api/add-customer", async (req, res) => {
+  await addRole(req.body.discordId);
+  res.status(204).send();
+});
+
+app.post("/api/remove-customer", async (req, res) => {
+  await removeRole(req.body.discordId);
+  res.status(204).send();
+});
+
+app.listen(API_PORT);

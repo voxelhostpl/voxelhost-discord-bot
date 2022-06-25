@@ -13,8 +13,11 @@ FROM alpine:$ALPINE_VERSION AS production
 
 RUN apk add --no-cache nodejs tini
 
+VOLUME /data
+WORKDIR /app
+
 ENV NODE_ENV=production
-EXPOSE 3000/tcp
+EXPOSE 80/tcp
 ENTRYPOINT [ "/sbin/tini", "--" ]
 CMD [ "node", "src/main.js" ]
 

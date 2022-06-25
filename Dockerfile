@@ -16,8 +16,8 @@ RUN apk add --no-cache nodejs tini
 ENV NODE_ENV=production
 EXPOSE 3000/tcp
 ENTRYPOINT [ "/sbin/tini", "--" ]
-CMD [ "node", "./main.js" ]
+CMD [ "node", "src/main.js" ]
 
-COPY main.js .
+COPY src ./src
 COPY .env .
 COPY --from=production_dependencies node_modules node_modules

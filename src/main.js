@@ -13,12 +13,10 @@ const {
 const dayjs = require("dayjs");
 const express = require("express");
 const bodyParser = require("body-parser");
-const sqlite = require("sqlite3");
 
-const DB = new sqlite.Database("./database.db");
-DB.run(`CREATE TABLE IF NOT EXISTS customers (
-  discordId VARCHAR(18) PRIMARY KEY
-)`);
+const Database = require("./database");
+
+const db = new Database();
 
 const {
   CLIENT_ID,
@@ -179,12 +177,18 @@ const app = express();
 app.use(bodyParser.json());
 
 app.post("/api/add-customer", async (req, res) => {
-  await addRole(req.body.discordId);
+  const id = req.body.discordId;
+  await addRole(id);
+  await db.addCustomer(id);
+
   res.status(204).send();
 });
 
 app.post("/api/remove-customer", async (req, res) => {
-  await removeRole(req.body.discordId);
+  const id = req.body.discordId;
+  await removeRole(id);
+  await db.removeCustomer(id);
+
   res.status(204).send();
 });
 

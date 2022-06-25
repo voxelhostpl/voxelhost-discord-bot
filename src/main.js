@@ -149,9 +149,7 @@ client.on("interactionCreate", async interaction => {
   }
 });
 
-client.login(TOKEN);
-
-const addRole = async userId => {
+const addCustomerRole = async userId => {
   const guild = await client.guilds.fetch(GUILD_ID);
   const member = await guild.members.fetch(userId);
 
@@ -162,7 +160,7 @@ const addRole = async userId => {
   await member.roles.add(CUSTOMER_ROLE_ID);
 };
 
-const removeRole = async userId => {
+const removeCustomerRole = async userId => {
   const guild = await client.guilds.fetch(GUILD_ID);
   const member = await guild.members.fetch(userId);
 
@@ -173,12 +171,21 @@ const removeRole = async userId => {
   await member.roles.remove(CUSTOMER_ROLE_ID);
 };
 
+client.on("guildMemberAdd", async member => {
+  const { id } = member;
+  if (await db.isCustomer(id)) {
+    addCustomerRole(id);
+  }
+});
+
+client.login(TOKEN);
+
 const app = express();
 app.use(bodyParser.json());
 
 app.post("/api/add-customer", async (req, res) => {
   const id = req.body.discordId;
-  await addRole(id);
+  await addCustomerRole(id);
   await db.addCustomer(id);
 
   res.status(204).send();
@@ -186,7 +193,7 @@ app.post("/api/add-customer", async (req, res) => {
 
 app.post("/api/remove-customer", async (req, res) => {
   const id = req.body.discordId;
-  await removeRole(id);
+  await removeCustomerRole(id);
   await db.removeCustomer(id);
 
   res.status(204).send();

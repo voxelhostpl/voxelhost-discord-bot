@@ -32,20 +32,15 @@ const slowmodeCommand = new SlashCommandBuilder()
   )
   .toJSON();
 
-const commands = [slowmodeCommand];
-
 rest.put(Routes.applicationCommands(CLIENT_ID), {
-  body: commands,
+  body: [slowmodeCommand],
 });
 
 client.once("ready", () => {
   console.log("Ready!");
 });
 
-client.on("messageCreate", async message => {
-  if (message.channelId !== HELP_CHANNEL_ID) return;
-  if (message.hasThread) return;
-
+const createSupportThread = async message => {
   const user = message.author;
 
   const date = dayjs().format("DD-MM-YYYY");
@@ -72,12 +67,9 @@ client.on("messageCreate", async message => {
       ),
     ],
   });
-});
+};
 
-client.on("messageCreate", async message => {
-  if (message.channelId !== SUGGESTIONS_CHANNEL_ID) return;
-  if (message.hasThread) return;
-
+const createSuggestionThread = async message => {
   let name = message.content;
 
   if (name.length > 100) {
@@ -92,6 +84,16 @@ client.on("messageCreate", async message => {
 
   message.react("✅");
   message.react("❌");
+};
+
+client.on("messageCreate", async message => {
+  if (message.channelId === HELP_CHANNEL_ID && !message.hasThread) {
+    createSupportThread(message);
+  }
+
+  if (message.channelId === SUGGESTIONS_CHANNEL_ID && !message.hasThread) {
+    createSuggestionThread(message);
+  }
 });
 
 client.on("interactionCreate", async interaction => {

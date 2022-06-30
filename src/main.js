@@ -148,7 +148,6 @@ client.on("interactionCreate", async interaction => {
     }
 
     await interaction.reply(`Wątek zamknięty przez ${user}!`);
-    await interaction.channel.setArchived(true);
     await interaction.channel.setLocked(true);
   }
 });

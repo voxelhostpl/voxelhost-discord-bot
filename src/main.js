@@ -143,7 +143,7 @@ client.on("interactionCreate", async interaction => {
     });
   }
 
-  if (interaction.isCommand() && interaction.commandName("nonpremium")) {
+  if (interaction.isCommand() && interaction.commandName === "nonpremium") {
     await interaction.reply({
       content:
         "Ustawienie trybu non-premium (offline mode): https://docs.voxelhost.pl/tutorial/onlinemode",

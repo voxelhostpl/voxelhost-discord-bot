@@ -1,4 +1,4 @@
-FROM node:16-alpine AS production_dependencies
+FROM node:18-alpine AS production_dependencies
 
 COPY package.json yarn.lock ./
 RUN yarn install --production --frozen-lockfile

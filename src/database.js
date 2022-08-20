@@ -1,8 +1,8 @@
 const sqlite = require("sqlite3");
 
 class Database {
-  constructor() {
-    this.db = new sqlite.Database("/data/database.db");
+  constructor(path) {
+    this.db = new sqlite.Database(path);
     this.db.run(
       "CREATE TABLE IF NOT EXISTS customers (discordId VARCHAR(18) PRIMARY KEY)",
     );

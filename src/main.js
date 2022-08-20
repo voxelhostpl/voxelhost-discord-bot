@@ -14,19 +14,18 @@ const dayjs = require("dayjs");
 const express = require("express");
 const bodyParser = require("body-parser");
 
-const Database = require("./database");
-
-const db = new Database();
-
 const {
   CLIENT_ID,
   TOKEN,
   SUGGESTIONS_CHANNEL_ID,
   HELP_CHANNEL_ID,
-  API_PORT,
   GUILD_ID,
   CUSTOMER_ROLE_ID,
+  DB_PATH,
 } = process.env;
+
+const Database = require("./database");
+const db = new Database(DB_PATH);
 
 const rest = new REST().setToken(TOKEN);
 const client = new Client({
@@ -40,7 +39,8 @@ const client = new Client({
 const slowmodeCommand = new SlashCommandBuilder()
   .setName("slowmode")
   .setDescription("Set slowmode")
-  .setDefaultPermission(false)
+  .setDefaultMemberPermissions(Permissions.FLAGS.MANAGE_CHANNELS)
+  .setDMPermission(false)
   .addIntegerOption(option =>
     option
       .setName("delay")
@@ -49,8 +49,13 @@ const slowmodeCommand = new SlashCommandBuilder()
   )
   .toJSON();
 
+const bungeeCommand = new SlashCommandBuilder()
+  .setName("bungee")
+  .setDescription("Utility command")
+  .toJSON();
+
 rest.put(Routes.applicationCommands(CLIENT_ID), {
-  body: [slowmodeCommand],
+  body: [slowmodeCommand, bungeeCommand],
 });
 
 client.once("ready", () => {
@@ -74,7 +79,7 @@ const createSupportThread = async message => {
   );
   await thread.send({
     content:
-      "Jeśli uzyskałeś już zadowalającą Cię pomoc użyj przycisku na dole, aby zamknąć wątek.",
+      "Jeśli Twój problem został już rozwiązany użyj przycisku na dole, aby zamknąć wątek.",
     components: [
       new MessageActionRow().addComponents(
         new MessageButton()
@@ -93,14 +98,15 @@ const createSuggestionThread = async message => {
     name = `${name.slice(0, 97)}...`;
   }
 
-  message.channel.threads.create({
-    name,
-    startMessage: message,
-    reason: "Automatic thread creation for suggestion",
-  });
-
-  message.react("✅");
-  message.react("❌");
+  await Promise.all([
+    message.channel.threads.create({
+      name,
+      startMessage: message,
+      reason: "Automatic thread creation for suggestion",
+    }),
+    message.react("✅"),
+    message.react("❌"),
+  ]);
 };
 
 client.on("messageCreate", async message => {
@@ -122,6 +128,13 @@ client.on("interactionCreate", async interaction => {
     await interaction.reply({
       content: `Set slowmode to ${delay} seconds`,
       ephemeral: true,
+    });
+  }
+
+  if (interaction.isCommand() && interaction.commandName === "bungee") {
+    await interaction.reply({
+      content:
+        "Obecnie nie oferujemy hostingu BungeeCord, ale jeśli masz już serwer Bungee na innym hostingu, możesz skorzystać z naszego poradnika: https://github.com/voxelhostpl/voxelbungee/wiki",
     });
   }
 
@@ -148,7 +161,7 @@ client.on("interactionCreate", async interaction => {
     }
 
     await interaction.reply(`Wątek zamknięty przez ${user}!`);
-    await interaction.channel.setLocked(true);
+    await interaction.channel.setArchived(true);
   }
 });
 
@@ -202,4 +215,4 @@ app.post("/api/remove-customer", async (req, res) => {
   res.status(204).send();
 });
 
-app.listen(API_PORT);
+app.listen(80);

@@ -18,5 +18,6 @@ ENTRYPOINT [ "/sbin/tini", "--" ]
 CMD [ "node", "src/main.js" ]
 
 COPY src ./src
+COPY utility-commands ./utility-commands
 COPY .env .
 COPY --from=production_dependencies node_modules node_modules

@@ -1,15 +1,11 @@
-ARG BUILD_NODE_VERSION=16-alpine
-ARG ALPINE_VERSION=3
-
-
-FROM node:$BUILD_NODE_VERSION AS production_dependencies
+FROM node:16-alpine AS production_dependencies
 
 COPY package.json yarn.lock ./
 RUN yarn install --production --frozen-lockfile
 
 
 
-FROM alpine:$ALPINE_VERSION AS production
+FROM alpine:3 AS production
 
 RUN apk add --no-cache nodejs tini
 

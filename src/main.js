@@ -13,6 +13,12 @@ const {
 const dayjs = require("dayjs");
 const express = require("express");
 const bodyParser = require("body-parser");
+const Database = require("./database");
+const {
+  getUtilityCommands,
+  makeSlashCommands,
+  makeUtilityCommandHandler,
+} = require("./utility-commands");
 
 const {
   CLIENT_ID,
@@ -24,7 +30,6 @@ const {
   DB_PATH,
 } = process.env;
 
-const Database = require("./database");
 const db = new Database(DB_PATH);
 
 const rest = new REST().setToken(TOKEN);
@@ -49,18 +54,11 @@ const slowmodeCommand = new SlashCommandBuilder()
   )
   .toJSON();
 
-const bungeeCommand = new SlashCommandBuilder()
-  .setName("bungee")
-  .setDescription("Utility command")
-  .toJSON();
-
-const nonpremiumCommand = new SlashCommandBuilder()
-  .setName("nonpremium")
-  .setDescription("Utility command")
-  .toJSON();
+const utilityCommands = getUtilityCommands();
+const utilitySlashCommands = makeSlashCommands(utilityCommands);
 
 rest.put(Routes.applicationCommands(CLIENT_ID), {
-  body: [slowmodeCommand, bungeeCommand, nonpremiumCommand],
+  body: [slowmodeCommand, ...utilitySlashCommands],
 });
 
 client.once("ready", () => {
@@ -124,7 +122,14 @@ client.on("messageCreate", async message => {
   }
 });
 
+const { shouldHandle, handler } = makeUtilityCommandHandler(utilityCommands);
+
 client.on("interactionCreate", async interaction => {
+  if (shouldHandle(interaction)) {
+    handler(interaction);
+    return;
+  }
+
   if (interaction.isCommand() && interaction.commandName === "slowmode") {
     const delay = interaction.options.getInteger("delay") ?? 0;
 
@@ -133,20 +138,6 @@ client.on("interactionCreate", async interaction => {
     await interaction.reply({
       content: `Set slowmode to ${delay} seconds`,
       ephemeral: true,
-    });
-  }
-
-  if (interaction.isCommand() && interaction.commandName === "bungee") {
-    await interaction.reply({
-      content:
-        "Obecnie nie oferujemy hostingu BungeeCord, ale jeśli masz już serwer Bungee na innym hostingu, możesz skorzystać z naszego poradnika: https://github.com/voxelhostpl/voxelbungee/wiki",
-    });
-  }
-
-  if (interaction.isCommand() && interaction.commandName === "nonpremium") {
-    await interaction.reply({
-      content:
-        "Ustawienie trybu non-premium (offline mode): https://docs.voxelhost.pl/tutorial/onlinemode",
     });
   }
 

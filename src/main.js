@@ -54,8 +54,13 @@ const bungeeCommand = new SlashCommandBuilder()
   .setDescription("Utility command")
   .toJSON();
 
+const nonpremiumCommand = new SlashCommandBuilder()
+  .setName("nonpremium")
+  .setDescription("Utility command")
+  .toJSON();
+
 rest.put(Routes.applicationCommands(CLIENT_ID), {
-  body: [slowmodeCommand, bungeeCommand],
+  body: [slowmodeCommand, bungeeCommand, nonpremiumCommand],
 });
 
 client.once("ready", () => {
@@ -135,6 +140,13 @@ client.on("interactionCreate", async interaction => {
     await interaction.reply({
       content:
         "Obecnie nie oferujemy hostingu BungeeCord, ale jeśli masz już serwer Bungee na innym hostingu, możesz skorzystać z naszego poradnika: https://github.com/voxelhostpl/voxelbungee/wiki",
+    });
+  }
+
+  if (interaction.isCommand() && interaction.commandName("nonpremium")) {
+    await interaction.reply({
+      content:
+        "Ustawienie trybu non-premium (offline mode): https://docs.voxelhost.pl/tutorial/onlinemode",
     });
   }
 

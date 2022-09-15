@@ -1,15 +1,16 @@
-require("dotenv").config();
+require("dotenv").config({
+  path: process.env.NODE_ENV === "production" ? ".env" : ".env.local",
+});
 
 const { REST } = require("@discordjs/rest");
-const { Routes } = require("discord-api-types/v9");
-const { SlashCommandBuilder } = require("@discordjs/builders");
 const {
-  Client,
-  Intents,
-  MessageActionRow,
-  MessageButton,
-  Permissions,
-} = require("discord.js");
+  Routes,
+  GatewayIntentBits,
+  PermissionFlagsBits,
+  ButtonStyle,
+} = require("discord-api-types/v10");
+const { SlashCommandBuilder } = require("@discordjs/builders");
+const { Client, ActionRowBuilder, ButtonBuilder } = require("discord.js");
 const dayjs = require("dayjs");
 const express = require("express");
 const bodyParser = require("body-parser");
@@ -35,16 +36,16 @@ const db = new Database(DB_PATH);
 const rest = new REST().setToken(TOKEN);
 const client = new Client({
   intents: [
-    Intents.FLAGS.GUILDS,
-    Intents.FLAGS.GUILD_MESSAGES,
-    Intents.FLAGS.GUILD_MEMBERS,
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.GuildMembers,
   ],
 });
 
 const slowmodeCommand = new SlashCommandBuilder()
   .setName("slowmode")
   .setDescription("Set slowmode")
-  .setDefaultMemberPermissions(Permissions.FLAGS.MANAGE_CHANNELS)
+  .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
   .setDMPermission(false)
   .addIntegerOption(option =>
     option
@@ -84,9 +85,9 @@ const createSupportThread = async message => {
     content:
       "Jeśli Twój problem został już rozwiązany użyj przycisku na dole, aby zamknąć wątek.",
     components: [
-      new MessageActionRow().addComponents(
-        new MessageButton()
-          .setStyle("PRIMARY")
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setStyle(ButtonStyle.Primary)
           .setLabel("Zamknij wątek")
           .setCustomId("close-support-thread"),
       ),
@@ -113,6 +114,10 @@ const createSuggestionThread = async message => {
 };
 
 client.on("messageCreate", async message => {
+  if (message.guildId !== GUILD_ID) {
+    return;
+  }
+
   if (message.channelId === HELP_CHANNEL_ID && !message.hasThread) {
     createSupportThread(message);
   }
@@ -125,6 +130,10 @@ client.on("messageCreate", async message => {
 const { shouldHandle, handler } = makeUtilityCommandHandler(utilityCommands);
 
 client.on("interactionCreate", async interaction => {
+  if (interaction.guildId !== GUILD_ID) {
+    return;
+  }
+
   if (shouldHandle(interaction)) {
     handler(interaction);
     return;
@@ -151,9 +160,11 @@ client.on("interactionCreate", async interaction => {
     const starterMessage = await interaction.channel.fetchStarterMessage();
     const ownerId = starterMessage.author.id;
 
+    const isThreadOwner = user.id === ownerId;
+
     const hasPermissionToClose =
-      ownerId === user.id ||
-      member.permissions.has(Permissions.FLAGS.MANAGE_THREADS);
+      isThreadOwner ||
+      member.permissions.has(PermissionFlagsBits.ManageThreads);
 
     if (!hasPermissionToClose) {
       await interaction.reply({
@@ -164,7 +175,11 @@ client.on("interactionCreate", async interaction => {
     }
 
     await interaction.reply(`Wątek zamknięty przez ${user}!`);
-    await interaction.channel.setArchived(true);
+    await interaction.channel.setLocked(true);
+    await interaction.channel.setArchived(
+      true,
+      isThreadOwner ? "Thread closed by user" : "Thread closed by moderator",
+    );
   }
 });
 

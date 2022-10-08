@@ -1,11 +1,32 @@
 const sqlite = require("sqlite3");
 
+const TABLES = [
+  `CREATE TABLE IF NOT EXISTS customers (
+  discordId TEXT PRIMARY KEY
+)`,
+  `CREATE TABLE IF NOT EXISTS suggestions (
+  messageId    TEXT PRIMARY KEY,
+  status       TEXT CHECK(status IN ('REJECTED', 'PENDING', 'APPROVED', 'DONE')),
+  authorName   TEXT,
+  authorAvatar TEXT,
+  timestamp    INTEGER,
+  content      TEXT
+)`,
+];
+
+const SUGGESTION_STATUS = {
+  REJECTED: "REJECTED",
+  PENDING: "PENDING",
+  APPROVED: "APPROVED",
+  DONE: "DONE",
+};
+
 class Database {
   constructor(path) {
     this.db = new sqlite.Database(path);
-    this.db.run(
-      "CREATE TABLE IF NOT EXISTS customers (discordId VARCHAR(18) PRIMARY KEY)",
-    );
+    for (const tableSql of TABLES) {
+      this.run(tableSql);
+    }
   }
 
   async run(sql, params) {
@@ -48,6 +69,31 @@ class Database {
 
     return customer ? true : false;
   }
+
+  async newSuggestion(messageId, authorName, authorAvatar, timestamp, content) {
+    await this.run("INSERT INTO suggestions VALUES (?, ?, ?, ?, ?, ?)", [
+      messageId,
+      SUGGESTION_STATUS.PENDING,
+      authorName,
+      authorAvatar,
+      timestamp,
+      content,
+    ]);
+  }
+
+  async setSuggestionStatus(messageId, status) {
+    await this.run("UPDATE suggestions SET status = ? WHERE messageId = ?", [
+      status,
+      messageId,
+    ]);
+  }
+
+  async getSuggestion(messageId) {
+    return await this.get("SELECT * FROM suggestions WHERE messageId = ?", [
+      messageId,
+    ]);
+  }
 }
 
 module.exports = Database;
+module.exports.SUGGESTION_STATUS = SUGGESTION_STATUS;

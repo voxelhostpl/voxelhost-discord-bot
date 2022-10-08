@@ -10,11 +10,17 @@ const {
   ButtonStyle,
 } = require("discord-api-types/v10");
 const { SlashCommandBuilder } = require("@discordjs/builders");
-const { Client, ActionRowBuilder, ButtonBuilder } = require("discord.js");
+const {
+  Client,
+  ActionRowBuilder,
+  ButtonBuilder,
+  EmbedBuilder,
+} = require("discord.js");
 const dayjs = require("dayjs");
 const express = require("express");
 const bodyParser = require("body-parser");
 const Database = require("./database");
+const { SUGGESTION_STATUS } = require("./database");
 const {
   getUtilityCommands,
   makeSlashCommands,
@@ -53,14 +59,47 @@ const slowmodeCommand = new SlashCommandBuilder()
       .setName("delay")
       .setDescription("Delay in seconds")
       .setRequired(false),
-  )
-  .toJSON();
+  );
+
+const statusCommand = new SlashCommandBuilder()
+  .setName("status")
+  .setDescription("Sets the suggestion status")
+  .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
+  .setDMPermission(false)
+  .addStringOption(option =>
+    option
+      .setName("status")
+      .setDescription("The status to set to")
+      .setRequired(true)
+      .addChoices(
+        {
+          value: SUGGESTION_STATUS.APPROVED,
+          name: "Zaakceptowana",
+        },
+        {
+          value: SUGGESTION_STATUS.REJECTED,
+          name: "Odrzucona",
+        },
+        {
+          value: SUGGESTION_STATUS.PENDING,
+          name: "Oczekująca",
+        },
+        {
+          value: SUGGESTION_STATUS.DONE,
+          name: "Gotowa",
+        },
+      ),
+  );
 
 const utilityCommands = getUtilityCommands();
 const utilitySlashCommands = makeSlashCommands(utilityCommands);
 
 rest.put(Routes.applicationCommands(CLIENT_ID), {
-  body: [slowmodeCommand, ...utilitySlashCommands],
+  body: [
+    slowmodeCommand.toJSON(),
+    statusCommand.toJSON(),
+    ...utilitySlashCommands,
+  ],
 });
 
 client.once("ready", () => {
@@ -96,26 +135,8 @@ const createSupportThread = async message => {
   });
 };
 
-const createSuggestionThread = async message => {
-  let name = message.content;
-
-  if (name.length > 100) {
-    name = `${name.slice(0, 97)}...`;
-  }
-
-  await Promise.all([
-    message.channel.threads.create({
-      name,
-      startMessage: message,
-      reason: "Automatic thread creation for suggestion",
-    }),
-    message.react("✅"),
-    message.react("❌"),
-  ]);
-};
-
 client.on("messageCreate", async message => {
-  if (message.guildId !== GUILD_ID) {
+  if (message.guildId !== GUILD_ID || message.author.bot) {
     return;
   }
 
@@ -124,7 +145,52 @@ client.on("messageCreate", async message => {
   }
 
   if (message.channelId === SUGGESTIONS_CHANNEL_ID && !message.hasThread) {
-    createSuggestionThread(message);
+    message.delete();
+
+    const botMessage = await message.channel.send({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(0x0046ff)
+          .setAuthor({
+            name: message.author.username,
+            iconURL: message.author.avatarURL(),
+          })
+          .addFields([
+            {
+              name: "Status",
+              value: "Oczekująca",
+            },
+            {
+              name: "Treść",
+              value: message.content,
+            },
+          ])
+          .setTimestamp(),
+      ],
+    });
+
+    let threadName = message.content;
+
+    if (threadName.length > 100) {
+      threadName = `${threadName.slice(0, 97)}...`;
+    }
+
+    await Promise.all([
+      db.newSuggestion(
+        botMessage.id,
+        message.author.username,
+        message.author.avatarURL(),
+        Date.now(),
+        message.content,
+      ),
+      botMessage.channel.threads.create({
+        name: threadName,
+        startMessage: botMessage,
+        reason: "Automatic thread creation for suggestion",
+      }),
+      botMessage.react("✅"),
+      botMessage.react("❌"),
+    ]);
   }
 });
 
@@ -140,7 +206,10 @@ client.on("interactionCreate", async interaction => {
     return;
   }
 
-  if (interaction.isCommand() && interaction.commandName === "slowmode") {
+  if (
+    interaction.isCommand() &&
+    interaction.commandName === slowmodeCommand.name
+  ) {
     const delay = interaction.options.getInteger("delay") ?? 0;
 
     await interaction.channel.setRateLimitPerUser(delay);
@@ -148,6 +217,60 @@ client.on("interactionCreate", async interaction => {
     await interaction.reply({
       content: `Set slowmode to ${delay} seconds`,
       ephemeral: true,
+    });
+  }
+
+  if (
+    interaction.isCommand() &&
+    interaction.commandName === statusCommand.name &&
+    interaction.channel.isThread() &&
+    interaction.channel.parentId === SUGGESTIONS_CHANNEL_ID
+  ) {
+    const status = interaction.options.getString("status", true);
+    const starterMessage = await interaction.channel.fetchStarterMessage();
+    const suggestion = await db.getSuggestion(starterMessage.id);
+    if (!suggestion) {
+      interaction.reply({
+        content: "Nie znaleziono takiej sugestii!",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const statuses = {
+      [SUGGESTION_STATUS.APPROVED]: "Zaakceptowana",
+      [SUGGESTION_STATUS.REJECTED]: "Odrzucona",
+      [SUGGESTION_STATUS.PENDING]: "Oczekująca",
+      [SUGGESTION_STATUS.DONE]: "Gotowa",
+    };
+
+    db.setSuggestionStatus(starterMessage.id, status);
+
+    await starterMessage.edit({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(0x0046ff)
+          .setAuthor({
+            name: suggestion.authorName,
+            iconURL: suggestion.authorAvatar,
+          })
+          .addFields([
+            {
+              name: "Status",
+              value: statuses[status],
+              inline: true,
+            },
+            {
+              name: "Treść",
+              value: suggestion.content,
+            },
+          ])
+          .setTimestamp(suggestion.timestamp),
+      ],
+    });
+
+    await interaction.reply({
+      content: `${interaction.user} ustawił status sugestii na **${statuses[status]}**`,
     });
   }
 

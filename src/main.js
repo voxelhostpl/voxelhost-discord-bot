@@ -145,8 +145,6 @@ client.on("messageCreate", async message => {
   }
 
   if (message.channelId === SUGGESTIONS_CHANNEL_ID && !message.hasThread) {
-    message.delete();
-
     const botMessage = await message.channel.send({
       embeds: [
         new EmbedBuilder()
@@ -176,6 +174,7 @@ client.on("messageCreate", async message => {
     }
 
     await Promise.all([
+      message.delete(),
       db.newSuggestion(
         botMessage.id,
         message.author.username,

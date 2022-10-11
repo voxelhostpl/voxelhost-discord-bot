@@ -28,6 +28,7 @@ import {
 import {
   ActionRowBuilder,
   ButtonBuilder,
+  ChatInputCommandInteraction,
   Client,
   EmbedBuilder,
   Message,
@@ -218,6 +219,87 @@ client.on("messageCreate", async message => {
 
 const { shouldHandle, handler } = makeUtilityCommandHandler(utilityCommands);
 
+const handleSlowmodeCommand = async (
+  interaction: ChatInputCommandInteraction,
+) => {
+  const delay = interaction.options.getInteger("delay") ?? 0;
+
+  invariant(interaction.channel);
+  invariant("setRateLimitPerUser" in interaction.channel);
+
+  await interaction.channel.setRateLimitPerUser(delay);
+
+  await interaction.reply({
+    content: `Set slowmode to ${delay} seconds`,
+    ephemeral: true,
+  });
+};
+
+const handleStatusCommand = async (
+  interaction: ChatInputCommandInteraction,
+) => {
+  invariant(interaction.channel?.isThread());
+
+  const status = interaction.options.getString(
+    "status",
+    true,
+  ) as SuggestionStatus;
+
+  const starterMessage = await interaction.channel.fetchStarterMessage();
+  if (!starterMessage) {
+    await interaction.reply({
+      content:
+        "Nie znaleziono początkowej wiadomości, być może została usunięta.",
+      ephemeral: true,
+    });
+    return;
+  }
+  const suggestion = await db.getSuggestion(starterMessage.id);
+  if (!suggestion) {
+    interaction.reply({
+      content: "Nie znaleziono takiej sugestii!",
+      ephemeral: true,
+    });
+    return;
+  }
+
+  const statuses = {
+    [SuggestionStatus.Approved]: "Zaakceptowana",
+    [SuggestionStatus.Rejected]: "Odrzucona",
+    [SuggestionStatus.Pending]: "Oczekująca",
+    [SuggestionStatus.Done]: "Gotowa",
+  };
+
+  db.setSuggestionStatus(starterMessage.id, status);
+
+  await starterMessage.edit({
+    embeds: [
+      new EmbedBuilder()
+        .setColor(0x0046ff)
+        .setAuthor({
+          name: suggestion.authorName,
+          iconURL: suggestion.authorAvatar,
+        })
+        .addFields([
+          {
+            name: "Status",
+            value: statuses[status],
+            inline: true,
+          },
+          {
+            name: "Treść",
+            value: suggestion.content,
+          },
+        ])
+        .setTimestamp(suggestion.timestamp),
+    ],
+  });
+
+  await interaction.reply({
+    content: `${interaction.user} ustawił status sugestii na **${statuses[status]}**`,
+  });
+};
+
 client.on("interactionCreate", async interaction => {
   if (interaction.guildId !== GUILD_ID) {
     return;
@@ -232,17 +314,7 @@ client.on("interactionCreate", async interaction => {
     interaction.isChatInputCommand() &&
     interaction.commandName === slowmodeCommand.name
   ) {
-    const delay = interaction.options.getInteger("delay") ?? 0;
-
-    invariant(interaction.channel);
-    invariant("setRateLimitPerUser" in interaction.channel);
-
-    await interaction.channel.setRateLimitPerUser(delay);
-
-    await interaction.reply({
-      content: `Set slowmode to ${delay} seconds`,
-      ephemeral: true,
-    });
+    handleSlowmodeCommand(interaction);
   }
 
   if (
@@ -251,63 +323,7 @@ client.on("interactionCreate", async interaction => {
     interaction.channel?.isThread() &&
     interaction.channel.parentId === SUGGESTIONS_CHANNEL_ID
   ) {
-    const status = interaction.options.getString(
-      "status",
-      true,
-    ) as SuggestionStatus;
-    const starterMessage = await interaction.channel.fetchStarterMessage();
-    if (!starterMessage) {
-      await interaction.reply({
-        content:
-          "Nie znaleziono początkowej wiadomości, być może została usunięta.",
-        ephemeral: true,
-      });
-      return;
-    }
-    const suggestion = await db.getSuggestion(starterMessage.id);
-    if (!suggestion) {
-      interaction.reply({
-        content: "Nie znaleziono takiej sugestii!",
-        ephemeral: true,
-      });
-      return;
-    }
-
-    const statuses = {
-      [SuggestionStatus.Approved]: "Zaakceptowana",
-      [SuggestionStatus.Rejected]: "Odrzucona",
-      [SuggestionStatus.Pending]: "Oczekująca",
-      [SuggestionStatus.Done]: "Gotowa",
-    };
-
-    db.setSuggestionStatus(starterMessage.id, status);
-
-    await starterMessage.edit({
-      embeds: [
-        new EmbedBuilder()
-          .setColor(0x0046ff)
-          .setAuthor({
-            name: suggestion.authorName,
-            iconURL: suggestion.authorAvatar,
-          })
-          .addFields([
-            {
-              name: "Status",
-              value: statuses[status],
-              inline: true,
-            },
-            {
-              name: "Treść",
-              value: suggestion.content,
-            },
-          ])
-          .setTimestamp(suggestion.timestamp),
-      ],
-    });
-
-    await interaction.reply({
-      content: `${interaction.user} ustawił status sugestii na **${statuses[status]}**`,
-    });
+    handleStatusCommand(interaction);
   }
 
   if (

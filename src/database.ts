@@ -15,7 +15,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-import * as sqlite from "sqlite3";
+import sqlite from "sqlite3";
 
 const TABLES = [
   `CREATE TABLE IF NOT EXISTS customers (
@@ -30,13 +30,6 @@ const TABLES = [
   content      TEXT
 )`,
 ];
-
-export enum SuggestionStatus {
-  Rejected = "REJECTED",
-  Pending = "PENDING",
-  Approved = "APPROVED",
-  Done = "DONE",
-}
 
 export class Database {
   db: sqlite.Database;
@@ -70,52 +63,5 @@ export class Database {
         }
       });
     });
-  }
-
-  async addCustomer(id: string) {
-    await this.run("INSERT OR IGNORE INTO customers VALUES (?)", [id]);
-  }
-
-  async removeCustomer(id: string) {
-    await this.run("DELETE FROM customers WHERE discordId = ?", [id]);
-  }
-
-  async isCustomer(id: string) {
-    const customer = await this.get(
-      "SELECT * FROM customers WHERE discordId = ?",
-      [id],
-    );
-
-    return customer ? true : false;
-  }
-
-  async newSuggestion(
-    messageId: string,
-    authorName: string,
-    authorAvatar: string,
-    timestamp: number,
-    content: string,
-  ) {
-    await this.run("INSERT INTO suggestions VALUES (?, ?, ?, ?, ?, ?)", [
-      messageId,
-      SuggestionStatus.Pending,
-      authorName,
-      authorAvatar,
-      timestamp,
-      content,
-    ]);
-  }
-
-  async setSuggestionStatus(messageId: string, status: SuggestionStatus) {
-    await this.run("UPDATE suggestions SET status = ? WHERE messageId = ?", [
-      status,
-      messageId,
-    ]);
-  }
-
-  async getSuggestion(messageId: string) {
-    return await this.get("SELECT * FROM suggestions WHERE messageId = ?", [
-      messageId,
-    ]);
   }
 }

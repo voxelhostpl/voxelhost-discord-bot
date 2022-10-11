@@ -2,30 +2,32 @@ require("dotenv").config({
   path: process.env.NODE_ENV === "production" ? ".env" : ".env.local",
 });
 
-const { REST } = require("@discordjs/rest");
-const {
+import { REST } from "@discordjs/rest";
+import {
   Routes,
   GatewayIntentBits,
   PermissionFlagsBits,
   ButtonStyle,
-} = require("discord-api-types/v10");
-const { SlashCommandBuilder } = require("@discordjs/builders");
-const {
+} from "discord-api-types/v10";
+import { SlashCommandBuilder } from "@discordjs/builders";
+import {
   Client,
   ActionRowBuilder,
   ButtonBuilder,
   EmbedBuilder,
-} = require("discord.js");
-const dayjs = require("dayjs");
-const express = require("express");
-const bodyParser = require("body-parser");
-const Database = require("./database");
-const { SUGGESTION_STATUS } = require("./database");
-const {
+  Message,
+  TextChannel,
+  BaseGuildTextChannel,
+} from "discord.js";
+import dayjs from "dayjs";
+import express from "express";
+import bodyParser from "body-parser";
+import { Database, SuggestionStatus } from "./database";
+import {
   getUtilityCommands,
   makeSlashCommands,
   makeUtilityCommandHandler,
-} = require("./utility-commands");
+} from "./utility-commands";
 
 const {
   CLIENT_ID,
@@ -35,7 +37,7 @@ const {
   GUILD_ID,
   CUSTOMER_ROLE_ID,
   DB_PATH,
-} = process.env;
+} = process.env as any;
 
 const db = new Database(DB_PATH);
 
@@ -73,19 +75,19 @@ const statusCommand = new SlashCommandBuilder()
       .setRequired(true)
       .addChoices(
         {
-          value: SUGGESTION_STATUS.APPROVED,
+          value: SuggestionStatus.Approved,
           name: "Zaakceptowana",
         },
         {
-          value: SUGGESTION_STATUS.REJECTED,
+          value: SuggestionStatus.Rejected,
           name: "Odrzucona",
         },
         {
-          value: SUGGESTION_STATUS.PENDING,
+          value: SuggestionStatus.Pending,
           name: "Oczekująca",
         },
         {
-          value: SUGGESTION_STATUS.DONE,
+          value: SuggestionStatus.Done,
           name: "Gotowa",
         },
       ),
@@ -106,11 +108,13 @@ client.once("ready", () => {
   console.log("Ready!");
 });
 
-const createSupportThread = async message => {
+const createSupportThread = async (message: Message) => {
   const user = message.author;
 
   const date = dayjs().format("DD-MM-YYYY");
   const name = `${user.username} [${date}]`;
+
+  if (!(message.channel instanceof TextChannel)) return;
 
   const thread = await message.channel.threads.create({
     name,
@@ -121,17 +125,18 @@ const createSupportThread = async message => {
   await thread.send(
     `Hej ${user}! Stworzyłem ten wątek automaycznie z Twojej wiadomości.`,
   );
+
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setStyle(ButtonStyle.Primary)
+      .setLabel("Zamknij wątek")
+      .setCustomId("close-support-thread"),
+  );
   await thread.send({
     content:
       "Jeśli Twój problem został już rozwiązany użyj przycisku na dole, aby zamknąć wątek.",
-    components: [
-      new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setStyle(ButtonStyle.Primary)
-          .setLabel("Zamknij wątek")
-          .setCustomId("close-support-thread"),
-      ),
-    ],
+    // todo: typescript complains about it
+    components: [row as any],
   });
 };
 
@@ -151,7 +156,7 @@ client.on("messageCreate", async message => {
           .setColor(0x0046ff)
           .setAuthor({
             name: message.author.username,
-            iconURL: message.author.avatarURL(),
+            iconURL: message.author.avatarURL() ?? undefined,
           })
           .addFields([
             {
@@ -167,6 +172,9 @@ client.on("messageCreate", async message => {
       ],
     });
 
+    // check to keep typescript happy
+    if (!(botMessage.channel instanceof TextChannel)) return;
+
     let threadName = message.content;
 
     if (threadName.length > 100) {
@@ -178,7 +186,7 @@ client.on("messageCreate", async message => {
       db.newSuggestion(
         botMessage.id,
         message.author.username,
-        message.author.avatarURL(),
+        message.author.avatarURL() ?? "",
         Date.now(),
         message.content,
       ),
@@ -206,12 +214,13 @@ client.on("interactionCreate", async interaction => {
   }
 
   if (
-    interaction.isCommand() &&
+    interaction.isChatInputCommand() &&
     interaction.commandName === slowmodeCommand.name
   ) {
     const delay = interaction.options.getInteger("delay") ?? 0;
 
-    await interaction.channel.setRateLimitPerUser(delay);
+    // todo: get rid of this any
+    await (interaction.channel as any).setRateLimitPerUser(delay);
 
     await interaction.reply({
       content: `Set slowmode to ${delay} seconds`,
@@ -220,13 +229,24 @@ client.on("interactionCreate", async interaction => {
   }
 
   if (
-    interaction.isCommand() &&
+    interaction.isChatInputCommand() &&
     interaction.commandName === statusCommand.name &&
-    interaction.channel.isThread() &&
+    interaction.channel?.isThread() &&
     interaction.channel.parentId === SUGGESTIONS_CHANNEL_ID
   ) {
-    const status = interaction.options.getString("status", true);
+    const status = interaction.options.getString(
+      "status",
+      true,
+    ) as SuggestionStatus;
     const starterMessage = await interaction.channel.fetchStarterMessage();
+    if (!starterMessage) {
+      await interaction.reply({
+        content:
+          "Nie znaleziono początkowej wiadomości, być może została usunięta.",
+        ephemeral: true,
+      });
+      return;
+    }
     const suggestion = await db.getSuggestion(starterMessage.id);
     if (!suggestion) {
       interaction.reply({
@@ -237,10 +257,10 @@ client.on("interactionCreate", async interaction => {
     }
 
     const statuses = {
-      [SUGGESTION_STATUS.APPROVED]: "Zaakceptowana",
-      [SUGGESTION_STATUS.REJECTED]: "Odrzucona",
-      [SUGGESTION_STATUS.PENDING]: "Oczekująca",
-      [SUGGESTION_STATUS.DONE]: "Gotowa",
+      [SuggestionStatus.Approved]: "Zaakceptowana",
+      [SuggestionStatus.Rejected]: "Odrzucona",
+      [SuggestionStatus.Pending]: "Oczekująca",
+      [SuggestionStatus.Done]: "Gotowa",
     };
 
     db.setSuggestionStatus(starterMessage.id, status);
@@ -276,18 +296,29 @@ client.on("interactionCreate", async interaction => {
   if (
     interaction.isButton() &&
     interaction.customId === "close-support-thread" &&
-    interaction.channel.isThread()
+    interaction.channel?.isThread()
   ) {
     const { user, member } = interaction;
+    if (!member) return;
 
     const starterMessage = await interaction.channel.fetchStarterMessage();
+    if (!starterMessage) {
+      await interaction.reply({
+        content:
+          "Nie znaleziono początkowej wiadomości, być może została usunięta.",
+        ephemeral: true,
+      });
+      return;
+    }
+
     const ownerId = starterMessage.author.id;
 
     const isThreadOwner = user.id === ownerId;
 
     const hasPermissionToClose =
       isThreadOwner ||
-      member.permissions.has(PermissionFlagsBits.ManageThreads);
+      // todo: get rid of this any
+      (member.permissions as any).has(PermissionFlagsBits.ManageThreads);
 
     if (!hasPermissionToClose) {
       await interaction.reply({
@@ -306,7 +337,7 @@ client.on("interactionCreate", async interaction => {
   }
 });
 
-const addCustomerRole = async userId => {
+const addCustomerRole = async (userId: string) => {
   const guild = await client.guilds.fetch(GUILD_ID);
   const member = await guild.members.fetch(userId);
 
@@ -317,7 +348,7 @@ const addCustomerRole = async userId => {
   await member.roles.add(CUSTOMER_ROLE_ID);
 };
 
-const removeCustomerRole = async userId => {
+const removeCustomerRole = async (userId: string) => {
   const guild = await client.guilds.fetch(GUILD_ID);
   const member = await guild.members.fetch(userId);
 

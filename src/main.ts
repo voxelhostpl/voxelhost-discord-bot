@@ -18,6 +18,7 @@ import {
   Client,
   EmbedBuilder,
   Message,
+  MessageActionRowComponentBuilder,
   TextChannel,
 } from "discord.js";
 import express from "express";
@@ -27,6 +28,7 @@ import {
   makeSlashCommands,
   makeUtilityCommandHandler,
 } from "./utility-commands";
+import invariant from "tiny-invariant";
 
 const {
   CLIENT_ID,
@@ -113,7 +115,7 @@ const createSupportThread = async (message: Message) => {
   const date = dayjs().format("DD-MM-YYYY");
   const name = `${user.username} [${date}]`;
 
-  if (!(message.channel instanceof TextChannel)) return;
+  invariant(message.channel instanceof TextChannel);
 
   const thread = await message.channel.threads.create({
     name,
@@ -125,17 +127,18 @@ const createSupportThread = async (message: Message) => {
     `Hej ${user}! Stworzyłem ten wątek automaycznie z Twojej wiadomości.`,
   );
 
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder()
-      .setStyle(ButtonStyle.Primary)
-      .setLabel("Zamknij wątek")
-      .setCustomId("close-support-thread"),
-  );
+  const row =
+    new ActionRowBuilder<MessageActionRowComponentBuilder>().setComponents(
+      new ButtonBuilder()
+        .setStyle(ButtonStyle.Primary)
+        .setLabel("Zamknij wątek")
+        .setCustomId("close-support-thread"),
+    );
+
   await thread.send({
     content:
       "Jeśli Twój problem został już rozwiązany użyj przycisku na dole, aby zamknąć wątek.",
-    // todo: typescript complains about it
-    components: [row as any],
+    components: [row],
   });
 };
 
@@ -171,8 +174,7 @@ client.on("messageCreate", async message => {
       ],
     });
 
-    // check to keep typescript happy
-    if (!(botMessage.channel instanceof TextChannel)) return;
+    invariant(botMessage.channel instanceof TextChannel);
 
     let threadName = message.content;
 
@@ -218,8 +220,10 @@ client.on("interactionCreate", async interaction => {
   ) {
     const delay = interaction.options.getInteger("delay") ?? 0;
 
-    // todo: get rid of this any
-    await (interaction.channel as any).setRateLimitPerUser(delay);
+    invariant(interaction.channel);
+    invariant("setRateLimitPerUser" in interaction.channel);
+
+    await interaction.channel.setRateLimitPerUser(delay);
 
     await interaction.reply({
       content: `Set slowmode to ${delay} seconds`,
@@ -297,8 +301,9 @@ client.on("interactionCreate", async interaction => {
     interaction.customId === "close-support-thread" &&
     interaction.channel?.isThread()
   ) {
-    const { user, member } = interaction;
-    if (!member) return;
+    const { user, member, memberPermissions } = interaction;
+    invariant(member);
+    invariant(memberPermissions);
 
     const starterMessage = await interaction.channel.fetchStarterMessage();
     if (!starterMessage) {
@@ -315,9 +320,7 @@ client.on("interactionCreate", async interaction => {
     const isThreadOwner = user.id === ownerId;
 
     const hasPermissionToClose =
-      isThreadOwner ||
-      // todo: get rid of this any
-      (member.permissions as any).has(PermissionFlagsBits.ManageThreads);
+      isThreadOwner || memberPermissions.has(PermissionFlagsBits.ManageThreads);
 
     if (!hasPermissionToClose) {
       await interaction.reply({

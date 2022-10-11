@@ -2,6 +2,7 @@ import { SlashCommandBuilder } from "@discordjs/builders";
 import type { Interaction } from "discord.js";
 import fs from "fs";
 import path from "path";
+import invariant from "tiny-invariant";
 
 const BASE_PATH = "./utility-commands";
 
@@ -34,7 +35,7 @@ export const makeUtilityCommandHandler = (commands: UtilityCommand[]) => {
     interaction.isCommand() && findCommand(interaction.commandName);
 
   const handler = (interaction: Interaction) => {
-    if (!interaction.isCommand()) return;
+    invariant(interaction.isCommand());
     const cmd = findCommand(interaction.commandName);
     if (!cmd) throw new Error(`Command ${interaction.commandName} not found`);
     const { content } = cmd;

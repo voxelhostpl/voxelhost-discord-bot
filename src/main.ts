@@ -36,6 +36,7 @@ import {
 } from "discord.js";
 import express from "express";
 import invariant from "tiny-invariant";
+import { CustomersRepository } from "./customers";
 import { Database } from "./database";
 import { env } from "./env";
 import {
@@ -60,6 +61,7 @@ const {
 
 const db = new Database(DB_PATH);
 const suggestionsRepository = new SuggestionsRepository(db);
+const customersRepository = new CustomersRepository(db);
 
 const rest = new REST().setToken(TOKEN);
 const client = new Client({
@@ -237,8 +239,8 @@ const removeCustomerRole = async (userId: string) => {
 };
 
 client.on("guildMemberAdd", async member => {
-  const { id } = member;
-  if (await db.isCustomer(id)) {
+  const id = member.id;
+  if (await customersRepository.exists(id)) {
     addCustomerRole(id);
   }
 });
@@ -251,7 +253,7 @@ app.use(bodyParser.json());
 app.post("/api/add-customer", async (req, res) => {
   const id = req.body.discordId;
   await addCustomerRole(id);
-  await db.addCustomer(id);
+  await customersRepository.create(id);
 
   res.status(204).send();
 });
@@ -259,7 +261,7 @@ app.post("/api/add-customer", async (req, res) => {
 app.post("/api/remove-customer", async (req, res) => {
   const id = req.body.discordId;
   await removeCustomerRole(id);
-  await db.removeCustomer(id);
+  await customersRepository.delete(id);
 
   res.status(204).send();
 });

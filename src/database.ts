@@ -64,21 +64,4 @@ export class Database {
       });
     });
   }
-
-  async addCustomer(id: string) {
-    await this.run("INSERT OR IGNORE INTO customers VALUES (?)", [id]);
-  }
-
-  async removeCustomer(id: string) {
-    await this.run("DELETE FROM customers WHERE discordId = ?", [id]);
-  }
-
-  async isCustomer(id: string) {
-    const customer = await this.get(
-      "SELECT * FROM customers WHERE discordId = ?",
-      [id],
-    );
-
-    return customer ? true : false;
-  }
 }

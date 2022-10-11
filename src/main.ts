@@ -36,7 +36,7 @@ import {
   TextChannel,
 } from "discord.js";
 import express from "express";
-import { Database, SuggestionStatus } from "./database";
+import { Database } from "./database";
 import {
   getUtilityCommands,
   makeSlashCommands,
@@ -44,6 +44,7 @@ import {
 } from "./utility-commands";
 import invariant from "tiny-invariant";
 import { env } from "./env";
+import { Suggestions, SuggestionStatus } from "./suggestions";
 
 const {
   CLIENT_ID,
@@ -56,6 +57,7 @@ const {
 } = env;
 
 const db = new Database(DB_PATH);
+const suggestions = new Suggestions(db);
 
 const rest = new REST().setToken(TOKEN);
 const client = new Client({
@@ -199,13 +201,13 @@ client.on("messageCreate", async message => {
 
     await Promise.all([
       message.delete(),
-      db.newSuggestion(
-        botMessage.id,
-        message.author.username,
-        message.author.avatarURL() ?? "",
-        Date.now(),
-        message.content,
-      ),
+      suggestions.create({
+        messageId: botMessage.id,
+        authorName: message.author.username,
+        authorAvatar: message.author.avatarURL() ?? "",
+        timestamp: Date.now(),
+        content: message.content,
+      }),
       botMessage.channel.threads.create({
         name: threadName,
         startMessage: botMessage,
@@ -254,7 +256,7 @@ const handleStatusCommand = async (
     });
     return;
   }
-  const suggestion = await db.getSuggestion(starterMessage.id);
+  const suggestion = await suggestions.getByMessageId(starterMessage.id);
   if (!suggestion) {
     interaction.reply({
       content: "Nie znaleziono takiej sugestii!",
@@ -270,7 +272,7 @@ const handleStatusCommand = async (
     [SuggestionStatus.Done]: "Gotowa",
   };
 
-  db.setSuggestionStatus(starterMessage.id, status);
+  suggestions.setStatus(starterMessage.id, status);
 
   await starterMessage.edit({
     embeds: [

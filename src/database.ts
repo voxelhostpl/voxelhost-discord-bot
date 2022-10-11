@@ -31,13 +31,6 @@ const TABLES = [
 )`,
 ];
 
-export enum SuggestionStatus {
-  Rejected = "REJECTED",
-  Pending = "PENDING",
-  Approved = "APPROVED",
-  Done = "DONE",
-}
-
 export class Database {
   db: sqlite.Database;
 
@@ -87,35 +80,5 @@ export class Database {
     );
 
     return customer ? true : false;
-  }
-
-  async newSuggestion(
-    messageId: string,
-    authorName: string,
-    authorAvatar: string,
-    timestamp: number,
-    content: string,
-  ) {
-    await this.run("INSERT INTO suggestions VALUES (?, ?, ?, ?, ?, ?)", [
-      messageId,
-      SuggestionStatus.Pending,
-      authorName,
-      authorAvatar,
-      timestamp,
-      content,
-    ]);
-  }
-
-  async setSuggestionStatus(messageId: string, status: SuggestionStatus) {
-    await this.run("UPDATE suggestions SET status = ? WHERE messageId = ?", [
-      status,
-      messageId,
-    ]);
-  }
-
-  async getSuggestion(messageId: string) {
-    return await this.get("SELECT * FROM suggestions WHERE messageId = ?", [
-      messageId,
-    ]);
   }
 }

@@ -15,16 +15,20 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import { SlashCommandBuilder } from "@discordjs/builders";
+import type { Client } from "discord.js";
 import fs from "fs";
 import path from "path";
-import { SlashCommandBuilder } from "@discordjs/builders";
-import type { Interaction } from "discord.js";
-import invariant from "tiny-invariant";
 import { env } from "./env";
 
-const { UTILITY_COMMANDS_PATH } = env;
+const { UTILITY_COMMANDS_PATH, CLIENT_ID, GUILD_ID } = env;
 
-export const getUtilityCommands = () => {
+type UtilityCommand = {
+  name: string;
+  content: string;
+};
+
+export const getUtilityCommands = (): UtilityCommand[] => {
   const commandFiles = fs.readdirSync(UTILITY_COMMANDS_PATH);
   return commandFiles.map(file => ({
     name: file,
@@ -32,38 +36,34 @@ export const getUtilityCommands = () => {
   }));
 };
 
-type UtilityCommand = {
-  name: string;
-  content: string;
-};
-
-export const makeSlashCommands = (commands: UtilityCommand[]) =>
-  commands.map(({ name }) =>
+export const getSlashCommands = (commands: UtilityCommand[]) => {
+  const slashCommands = commands.map(({ name }) =>
     new SlashCommandBuilder()
       .setName(name)
       .setDescription("Utility command")
       .toJSON(),
   );
 
-export const makeUtilityCommandHandler = (commands: UtilityCommand[]) => {
+  return slashCommands;
+};
+
+export const registerHandler = (client: Client, commands: UtilityCommand[]) => {
   const findCommand = (name: string) =>
     commands.find(({ name: commandName }) => commandName === name);
 
-  const shouldHandle = (interaction: Interaction) =>
-    interaction.isCommand() && findCommand(interaction.commandName);
+  client.on("interactionCreate", async interaction => {
+    if (!interaction.isCommand()) {
+      return;
+    }
 
-  const handler = (interaction: Interaction) => {
-    invariant(interaction.isCommand());
-    const cmd = findCommand(interaction.commandName);
-    if (!cmd) throw new Error(`Command ${interaction.commandName} not found`);
-    const { content } = cmd;
+    const command = findCommand(interaction.commandName);
+
+    if (!command) {
+      return;
+    }
+
     interaction.reply({
-      content,
+      content: command.content,
     });
-  };
-
-  return {
-    shouldHandle,
-    handler,
-  };
+  });
 };

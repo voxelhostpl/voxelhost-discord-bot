@@ -36,15 +36,15 @@ import {
   TextChannel,
 } from "discord.js";
 import express from "express";
-import { Database } from "./database";
-import {
-  getUtilityCommands,
-  makeSlashCommands,
-  makeUtilityCommandHandler,
-} from "./utility-commands";
 import invariant from "tiny-invariant";
+import { Database } from "./database";
 import { env } from "./env";
 import { Suggestions, SuggestionStatus } from "./suggestions";
+import {
+  getSlashCommands,
+  getUtilityCommands,
+  registerHandler,
+} from "./utility-commands";
 
 const {
   CLIENT_ID,
@@ -112,13 +112,13 @@ const statusCommand = new SlashCommandBuilder()
   );
 
 const utilityCommands = getUtilityCommands();
-const utilitySlashCommands = makeSlashCommands(utilityCommands);
+registerHandler(client, utilityCommands);
 
 rest.put(Routes.applicationCommands(CLIENT_ID), {
   body: [
     slowmodeCommand.toJSON(),
     statusCommand.toJSON(),
-    ...utilitySlashCommands,
+    ...getSlashCommands(utilityCommands),
   ],
 });
 
@@ -219,8 +219,6 @@ client.on("messageCreate", async message => {
   }
 });
 
-const { shouldHandle, handler } = makeUtilityCommandHandler(utilityCommands);
-
 const handleSlowmodeCommand = async (
   interaction: ChatInputCommandInteraction,
 ) => {
@@ -304,11 +302,6 @@ const handleStatusCommand = async (
 
 client.on("interactionCreate", async interaction => {
   if (interaction.guildId !== GUILD_ID) {
-    return;
-  }
-
-  if (shouldHandle(interaction)) {
-    handler(interaction);
     return;
   }
 

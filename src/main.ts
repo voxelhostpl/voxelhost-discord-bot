@@ -2,26 +2,25 @@ require("dotenv").config({
   path: process.env.NODE_ENV === "production" ? ".env" : ".env.local",
 });
 
+import { SlashCommandBuilder } from "@discordjs/builders";
 import { REST } from "@discordjs/rest";
+import bodyParser from "body-parser";
+import dayjs from "dayjs";
 import {
-  Routes,
+  ButtonStyle,
   GatewayIntentBits,
   PermissionFlagsBits,
-  ButtonStyle,
+  Routes,
 } from "discord-api-types/v10";
-import { SlashCommandBuilder } from "@discordjs/builders";
 import {
-  Client,
   ActionRowBuilder,
   ButtonBuilder,
+  Client,
   EmbedBuilder,
   Message,
   TextChannel,
-  BaseGuildTextChannel,
 } from "discord.js";
-import dayjs from "dayjs";
 import express from "express";
-import bodyParser from "body-parser";
 import { Database, SuggestionStatus } from "./database";
 import {
   getUtilityCommands,

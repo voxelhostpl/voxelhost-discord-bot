@@ -1,4 +1,4 @@
-import * as sqlite from "sqlite3";
+import sqlite from "sqlite3";
 
 const TABLES = [
   `CREATE TABLE IF NOT EXISTS customers (

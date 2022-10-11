@@ -1,7 +1,7 @@
-import fs from "fs";
-import path from "path";
 import { SlashCommandBuilder } from "@discordjs/builders";
 import type { Interaction } from "discord.js";
+import fs from "fs";
+import path from "path";
 
 const BASE_PATH = "./utility-commands";
 

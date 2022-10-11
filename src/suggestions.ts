@@ -18,10 +18,10 @@
 import { SlashCommandBuilder } from "@discordjs/builders";
 import { PermissionFlagsBits } from "discord-api-types/v10";
 import { Client, EmbedBuilder, TextChannel } from "discord.js";
+import invariant from "tiny-invariant";
+import z from "zod";
 import { Database } from "./database";
 import { env } from "./env";
-import z from "zod";
-import invariant from "tiny-invariant";
 
 const { SUGGESTIONS_CHANNEL_ID } = env;
 

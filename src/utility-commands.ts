@@ -21,7 +21,7 @@ import fs from "fs";
 import path from "path";
 import { env } from "./env";
 
-const { UTILITY_COMMANDS_PATH, CLIENT_ID, GUILD_ID } = env;
+const { UTILITY_COMMANDS_PATH } = env;
 
 type UtilityCommand = {
   name: string;

@@ -1,8 +1,14 @@
 {
   "name": "voxelhost-bot",
   "version": "1.0.0",
-  "main": "index.js",
-  "license": "MIT",
+  "main": "dist/index.js",
+  "scripts": {
+    "start": "ts-node src/main.ts",
+    "build": "tsc",
+    "docker:build": "docker build . -t europe-west3-docker.pkg.dev/voxelhost-pl/images/discord-bot",
+    "docker:push": "docker push europe-west3-docker.pkg.dev/voxelhost-pl/images/discord-bot",
+    "docker:run": "docker run europe-west3-docker.pkg.dev/voxelhost-pl/images/discord-bot"
+  },
   "dependencies": {
     "@discordjs/rest": "^1.1.0",
     "body-parser": "^1.20.0",
@@ -13,9 +19,11 @@
     "express": "^4.18.1",
     "sqlite3": "^5.0.8"
   },
-  "scripts": {
-    "docker:build": "docker build . -t europe-west3-docker.pkg.dev/voxelhost-pl/images/discord-bot",
-    "docker:push": "docker push europe-west3-docker.pkg.dev/voxelhost-pl/images/discord-bot",
-    "docker:run": "docker run europe-west3-docker.pkg.dev/voxelhost-pl/images/discord-bot"
+  "devDependencies": {
+    "@types/body-parser": "^1.19.2",
+    "@types/express": "^4.17.14",
+    "@types/sqlite3": "^3.1.8",
+    "ts-node": "^10.9.1",
+    "typescript": "^4.8.4"
   }
 }

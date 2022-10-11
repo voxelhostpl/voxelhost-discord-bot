@@ -1,3 +1,14 @@
+FROM node:18-alpine AS builder
+
+COPY package.json yarn.lock ./
+RUN yarn install --frozen-lockfile
+
+COPY . .
+
+RUN yarn build
+
+
+
 FROM node:18-alpine AS production_dependencies
 
 COPY package.json yarn.lock ./
@@ -15,9 +26,9 @@ WORKDIR /app
 ENV NODE_ENV=production
 EXPOSE 80/tcp
 ENTRYPOINT [ "/sbin/tini", "--" ]
-CMD [ "node", "src/main.js" ]
+CMD [ "node", "dist/main.js" ]
 
-COPY src ./src
+COPY --from=builder dist ./dist
 COPY utility-commands ./utility-commands
 COPY .env .
 COPY --from=production_dependencies node_modules node_modules

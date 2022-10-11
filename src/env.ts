@@ -29,6 +29,7 @@ const envSchema = z.object({
   GUILD_ID: z.string().min(1),
   CUSTOMER_ROLE_ID: z.string().min(1),
   DB_PATH: z.string(),
+  UTILITY_COMMANDS_PATH: z.string().min(1),
 });
 
 const parsed = envSchema.safeParse(process.env);

@@ -20,14 +20,15 @@ import path from "path";
 import { SlashCommandBuilder } from "@discordjs/builders";
 import type { Interaction } from "discord.js";
 import invariant from "tiny-invariant";
+import { env } from "./env";
 
-const BASE_PATH = "./utility-commands";
+const { UTILITY_COMMANDS_PATH } = env;
 
 export const getUtilityCommands = () => {
-  const commandFiles = fs.readdirSync(BASE_PATH);
+  const commandFiles = fs.readdirSync(UTILITY_COMMANDS_PATH);
   return commandFiles.map(file => ({
     name: file,
-    content: fs.readFileSync(path.join(BASE_PATH, file)).toString(),
+    content: fs.readFileSync(path.join(UTILITY_COMMANDS_PATH, file)).toString(),
   }));
 };
 

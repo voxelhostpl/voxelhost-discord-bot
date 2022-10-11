@@ -15,10 +15,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-require("dotenv").config({
-  path: process.env.NODE_ENV === "production" ? ".env" : ".env.local",
-});
-
 import { SlashCommandBuilder } from "@discordjs/builders";
 import { REST } from "@discordjs/rest";
 import bodyParser from "body-parser";
@@ -46,6 +42,7 @@ import {
   makeUtilityCommandHandler,
 } from "./utility-commands";
 import invariant from "tiny-invariant";
+import { env } from "./env";
 
 const {
   CLIENT_ID,
@@ -55,7 +52,7 @@ const {
   GUILD_ID,
   CUSTOMER_ROLE_ID,
   DB_PATH,
-} = process.env as any;
+} = env;
 
 const db = new Database(DB_PATH);
 

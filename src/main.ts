@@ -30,7 +30,6 @@ import {
   ButtonBuilder,
   ChatInputCommandInteraction,
   Client,
-  EmbedBuilder,
   Message,
   MessageActionRowComponentBuilder,
   TextChannel,
@@ -39,17 +38,20 @@ import express from "express";
 import invariant from "tiny-invariant";
 import { Database } from "./database";
 import { env } from "./env";
-import { Suggestions, SuggestionStatus } from "./suggestions";
+import {
+  registerHandlers as registerSuggestionsHandlers,
+  SuggestionsRepository,
+  suggestionStatusCommand,
+} from "./suggestions";
 import {
   getSlashCommands,
   getUtilityCommands,
-  registerHandler,
+  registerHandler as registerUtilityCommandsHandler,
 } from "./utility-commands";
 
 const {
   CLIENT_ID,
   TOKEN,
-  SUGGESTIONS_CHANNEL_ID,
   HELP_CHANNEL_ID,
   GUILD_ID,
   CUSTOMER_ROLE_ID,
@@ -57,7 +59,7 @@ const {
 } = env;
 
 const db = new Database(DB_PATH);
-const suggestions = new Suggestions(db);
+const suggestionsRepository = new SuggestionsRepository(db);
 
 const rest = new REST().setToken(TOKEN);
 const client = new Client({
@@ -81,43 +83,15 @@ const slowmodeCommand = new SlashCommandBuilder()
       .setRequired(false),
   );
 
-const statusCommand = new SlashCommandBuilder()
-  .setName("status")
-  .setDescription("Sets the suggestion status")
-  .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
-  .setDMPermission(false)
-  .addStringOption(option =>
-    option
-      .setName("status")
-      .setDescription("The status to set to")
-      .setRequired(true)
-      .addChoices(
-        {
-          value: SuggestionStatus.Approved,
-          name: "Zaakceptowana",
-        },
-        {
-          value: SuggestionStatus.Rejected,
-          name: "Odrzucona",
-        },
-        {
-          value: SuggestionStatus.Pending,
-          name: "Oczekująca",
-        },
-        {
-          value: SuggestionStatus.Done,
-          name: "Gotowa",
-        },
-      ),
-  );
+registerSuggestionsHandlers(client, suggestionsRepository);
 
 const utilityCommands = getUtilityCommands();
-registerHandler(client, utilityCommands);
+registerUtilityCommandsHandler(client, utilityCommands);
 
 rest.put(Routes.applicationCommands(CLIENT_ID), {
   body: [
     slowmodeCommand.toJSON(),
-    statusCommand.toJSON(),
+    suggestionStatusCommand.toJSON(),
     ...getSlashCommands(utilityCommands),
   ],
 });
@@ -167,56 +141,6 @@ client.on("messageCreate", async message => {
   if (message.channelId === HELP_CHANNEL_ID && !message.hasThread) {
     createSupportThread(message);
   }
-
-  if (message.channelId === SUGGESTIONS_CHANNEL_ID && !message.hasThread) {
-    const botMessage = await message.channel.send({
-      embeds: [
-        new EmbedBuilder()
-          .setColor(0x0046ff)
-          .setAuthor({
-            name: message.author.username,
-            iconURL: message.author.avatarURL() ?? undefined,
-          })
-          .addFields([
-            {
-              name: "Status",
-              value: "Oczekująca",
-            },
-            {
-              name: "Treść",
-              value: message.content,
-            },
-          ])
-          .setTimestamp(),
-      ],
-    });
-
-    invariant(botMessage.channel instanceof TextChannel);
-
-    let threadName = message.content;
-
-    if (threadName.length > 100) {
-      threadName = `${threadName.slice(0, 97)}...`;
-    }
-
-    await Promise.all([
-      message.delete(),
-      suggestions.create({
-        messageId: botMessage.id,
-        authorName: message.author.username,
-        authorAvatar: message.author.avatarURL() ?? "",
-        timestamp: Date.now(),
-        content: message.content,
-      }),
-      botMessage.channel.threads.create({
-        name: threadName,
-        startMessage: botMessage,
-        reason: "Automatic thread creation for suggestion",
-      }),
-      botMessage.react("✅"),
-      botMessage.react("❌"),
-    ]);
-  }
 });
 
 const handleSlowmodeCommand = async (
@@ -235,71 +159,6 @@ const handleSlowmodeCommand = async (
   });
 };
 
-const handleStatusCommand = async (
-  interaction: ChatInputCommandInteraction,
-) => {
-  invariant(interaction.channel?.isThread());
-
-  const status = interaction.options.getString(
-    "status",
-    true,
-  ) as SuggestionStatus;
-
-  const starterMessage = await interaction.channel.fetchStarterMessage();
-  if (!starterMessage) {
-    await interaction.reply({
-      content:
-        "Nie znaleziono początkowej wiadomości, być może została usunięta.",
-      ephemeral: true,
-    });
-    return;
-  }
-  const suggestion = await suggestions.getByMessageId(starterMessage.id);
-  if (!suggestion) {
-    interaction.reply({
-      content: "Nie znaleziono takiej sugestii!",
-      ephemeral: true,
-    });
-    return;
-  }
-
-  const statuses = {
-    [SuggestionStatus.Approved]: "Zaakceptowana",
-    [SuggestionStatus.Rejected]: "Odrzucona",
-    [SuggestionStatus.Pending]: "Oczekująca",
-    [SuggestionStatus.Done]: "Gotowa",
-  };
-
-  suggestions.setStatus(starterMessage.id, status);
-
-  await starterMessage.edit({
-    embeds: [
-      new EmbedBuilder()
-        .setColor(0x0046ff)
-        .setAuthor({
-          name: suggestion.authorName,
-          iconURL: suggestion.authorAvatar,
-        })
-        .addFields([
-          {
-            name: "Status",
-            value: statuses[status],
-            inline: true,
-          },
-          {
-            name: "Treść",
-            value: suggestion.content,
-          },
-        ])
-        .setTimestamp(suggestion.timestamp),
-    ],
-  });
-
-  await interaction.reply({
-    content: `${interaction.user} ustawił status sugestii na **${statuses[status]}**`,
-  });
-};
-
 client.on("interactionCreate", async interaction => {
   if (interaction.guildId !== GUILD_ID) {
     return;
@@ -310,15 +169,6 @@ client.on("interactionCreate", async interaction => {
     interaction.commandName === slowmodeCommand.name
   ) {
     handleSlowmodeCommand(interaction);
-  }
-
-  if (
-    interaction.isChatInputCommand() &&
-    interaction.commandName === statusCommand.name &&
-    interaction.channel?.isThread() &&
-    interaction.channel.parentId === SUGGESTIONS_CHANNEL_ID
-  ) {
-    handleStatusCommand(interaction);
   }
 
   if (

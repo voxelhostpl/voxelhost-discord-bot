@@ -16,7 +16,7 @@
  */
 
 require("dotenv").config({
-  path: process.env.NODE_ENV === "production" ? ".env" : ".env.local",
+  path: process.env.NODE_ENV === "production" ? ".env" : "local.env",
 });
 
 import z from "zod";

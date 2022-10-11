@@ -1,5 +1,5 @@
 node_modules
-.env
+*.env
+!example.env
 dev.db
-.env.local
 dist

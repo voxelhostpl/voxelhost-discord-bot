@@ -15,28 +15,24 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import knex, { Knex } from "knex";
 import sqlite from "sqlite3";
-
-const SCHEMA = `
-CREATE TABLE IF NOT EXISTS customers (
-  discordId TEXT PRIMARY KEY
-);
-
-CREATE TABLE IF NOT EXISTS suggestions (
-  messageId    TEXT PRIMARY KEY,
-  status       TEXT CHECK(status IN ('REJECTED', 'PENDING', 'APPROVED', 'DONE')),
-  authorName   TEXT,
-  authorAvatar TEXT,
-  timestamp    INTEGER,
-  content      TEXT
-);`;
 
 export class Database {
   db: sqlite.Database;
+  knex: Knex;
 
   constructor(path: string) {
+    this.knex = knex({
+      client: "sqlite3",
+      connection: {
+        filename: path,
+      },
+      useNullAsDefault: true,
+    });
+    this.knex.migrate.latest();
+
     this.db = new sqlite.Database(path);
-    this.exec(SCHEMA);
   }
 
   async exec(sql: string) {

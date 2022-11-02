@@ -17,28 +17,38 @@
 
 import sqlite from "sqlite3";
 
-const TABLES = [
-  `CREATE TABLE IF NOT EXISTS customers (
+const SCHEMA = `
+CREATE TABLE IF NOT EXISTS customers (
   discordId TEXT PRIMARY KEY
-)`,
-  `CREATE TABLE IF NOT EXISTS suggestions (
+);
+
+CREATE TABLE IF NOT EXISTS suggestions (
   messageId    TEXT PRIMARY KEY,
   status       TEXT CHECK(status IN ('REJECTED', 'PENDING', 'APPROVED', 'DONE')),
   authorName   TEXT,
   authorAvatar TEXT,
   timestamp    INTEGER,
   content      TEXT
-)`,
-];
+);`;
 
 export class Database {
   db: sqlite.Database;
 
   constructor(path: string) {
     this.db = new sqlite.Database(path);
-    for (const tableSql of TABLES) {
-      this.run(tableSql);
-    }
+    this.exec(SCHEMA);
+  }
+
+  async exec(sql: string) {
+    return new Promise((resolve, reject) => {
+      this.db.exec(sql, error => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve(null);
+        }
+      });
+    });
   }
 
   async run(sql: string, params?: any) {

@@ -1,11 +1,11 @@
 import { Knex } from "knex";
 
 export async function up(knex: Knex): Promise<void> {
-  knex.schema.createTableIfNotExists("customers", table => {
+  await knex.schema.createTableIfNotExists("customers", table => {
     table.string("discordId").primary();
   });
 
-  knex.schema.createTableIfNotExists("suggestions", table => {
+  await knex.schema.createTableIfNotExists("suggestions", table => {
     table.string("messageId").primary();
     table.string("status").checkIn(["REJECTED", "PENDING", "APPROVED", "DONE"]);
     table.string("authorName");
@@ -16,6 +16,6 @@ export async function up(knex: Knex): Promise<void> {
 }
 
 export async function down(knex: Knex): Promise<void> {
-  knex.schema.dropTableIfExists("customers");
-  knex.schema.dropTableIfExists("suggestions");
+  await knex.schema.dropTableIfExists("customers");
+  await knex.schema.dropTableIfExists("suggestions");
 }

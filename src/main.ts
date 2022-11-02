@@ -41,6 +41,7 @@ import { Database } from "./database";
 import { env } from "./env";
 import {
   registerHandlers as registerSuggestionsHandlers,
+  suggestionPriorityCommand,
   SuggestionsRepository,
   suggestionStatusCommand,
 } from "./suggestions";
@@ -94,6 +95,7 @@ rest.put(Routes.applicationCommands(CLIENT_ID), {
   body: [
     slowmodeCommand.toJSON(),
     suggestionStatusCommand.toJSON(),
+    suggestionPriorityCommand.toJSON(),
     ...getSlashCommands(utilityCommands),
   ],
 });

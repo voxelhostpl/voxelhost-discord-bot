@@ -32,6 +32,12 @@ export enum SuggestionStatus {
   Done = "DONE",
 }
 
+export enum SuggestionPriority {
+  Low = "LOW",
+  Medium = "MEDIUM",
+  High = "HIGH",
+}
+
 export type Suggestion = {
   messageId: string;
   status: SuggestionStatus;
@@ -39,6 +45,7 @@ export type Suggestion = {
   authorAvatar: string;
   timestamp: number;
   content: string;
+  priority: SuggestionPriority;
 };
 
 export class SuggestionsRepository {
@@ -50,15 +57,16 @@ export class SuggestionsRepository {
     authorAvatar,
     timestamp,
     content,
-  }: Omit<Suggestion, "status">) {
-    await this.db.run("INSERT INTO suggestions VALUES (?, ?, ?, ?, ?, ?)", [
+  }: Omit<Suggestion, "status" | "priority">) {
+    await this.db.knex("suggestions").insert({
       messageId,
-      SuggestionStatus.Pending,
+      status: SuggestionStatus.Pending,
       authorName,
       authorAvatar,
       timestamp,
       content,
-    ]);
+      priority: SuggestionPriority.Medium,
+    });
   }
 
   async setStatus(messageId: string, status: SuggestionStatus) {
@@ -66,6 +74,10 @@ export class SuggestionsRepository {
       status,
       messageId,
     ]);
+  }
+
+  async setPriority(messageId: string, priority: SuggestionPriority) {
+    await this.db.knex("suggestions").where({ messageId }).update({ priority });
   }
 
   async getByMessageId(messageId: string): Promise<Suggestion | undefined> {
@@ -99,6 +111,58 @@ export const suggestionStatusCommand = new SlashCommandBuilder()
         })),
       ),
   );
+
+const prioritiesToPolish = {
+  [SuggestionPriority.Low]: "Niski",
+  [SuggestionPriority.Medium]: "Średni",
+  [SuggestionPriority.High]: "Wysoki",
+};
+
+export const suggestionPriorityCommand = new SlashCommandBuilder()
+  .setName("priority")
+  .setDescription("Sets the suggestion priority")
+  .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
+  .setDMPermission(false)
+  .addStringOption(option =>
+    option
+      .setName("priority")
+      .setDescription("The priority to set to")
+      .setRequired(true)
+      .addChoices(
+        ...Object.entries(prioritiesToPolish).map(([value, name]) => ({
+          value,
+          name,
+        })),
+      ),
+  );
+
+const createSuggestionEmbed = (suggestion: Omit<Suggestion, "messageId">) => {
+  const embed = new EmbedBuilder()
+    .setColor(0x0046ff)
+    .setAuthor({
+      name: suggestion.authorName,
+      iconURL: suggestion.authorAvatar,
+    })
+    .addFields([
+      {
+        name: "Status",
+        value: statusesToPolish[suggestion.status],
+        inline: true,
+      },
+      {
+        name: "Priorytet",
+        value: prioritiesToPolish[suggestion.priority],
+        inline: true,
+      },
+      {
+        name: "Treść",
+        value: suggestion.content,
+      },
+    ])
+    .setTimestamp(suggestion.timestamp);
+
+  return embed;
+};
 
 export const registerHandlers = (
   client: Client,
@@ -142,29 +206,66 @@ export const registerHandlers = (
 
     await starterMessage.edit({
       embeds: [
-        new EmbedBuilder()
-          .setColor(0x0046ff)
-          .setAuthor({
-            name: suggestion.authorName,
-            iconURL: suggestion.authorAvatar,
-          })
-          .addFields([
-            {
-              name: "Status",
-              value: statusesToPolish[status],
-              inline: true,
-            },
-            {
-              name: "Treść",
-              value: suggestion.content,
-            },
-          ])
-          .setTimestamp(suggestion.timestamp),
+        createSuggestionEmbed({
+          ...suggestion,
+          status,
+        }),
       ],
     });
 
     await interaction.reply({
       content: `${interaction.user} ustawił status sugestii na **${statusesToPolish[status]}**`,
+    });
+  });
+
+  client.on("interactionCreate", async interaction => {
+    if (
+      !interaction.isChatInputCommand() ||
+      !interaction.channel?.isThread() ||
+      interaction.channel.parentId !== SUGGESTIONS_CHANNEL_ID ||
+      interaction.commandName !== suggestionPriorityCommand.name
+    ) {
+      return;
+    }
+
+    const priorityUnsafe = interaction.options.getString("priority", true);
+    const priority = z.nativeEnum(SuggestionPriority).parse(priorityUnsafe);
+
+    const starterMessage = await interaction.channel.fetchStarterMessage();
+    if (!starterMessage) {
+      await interaction.reply({
+        content:
+          "Nie znaleziono początkowej wiadomości, być może została usunięta.",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    const suggestion = await suggestionsRepository.getByMessageId(
+      starterMessage.id,
+    );
+
+    if (!suggestion) {
+      interaction.reply({
+        content: "Nie znaleziono sugestii w bazie danych.",
+        ephemeral: true,
+      });
+      return;
+    }
+
+    suggestionsRepository.setPriority(starterMessage.id, priority);
+
+    await starterMessage.edit({
+      embeds: [
+        createSuggestionEmbed({
+          ...suggestion,
+          priority,
+        }),
+      ],
+    });
+
+    await interaction.reply({
+      content: `${interaction.user} ustawił priorytet sugestii na **${prioritiesToPolish[priority]}**`,
     });
   });
 
@@ -179,23 +280,14 @@ export const registerHandlers = (
 
     const botMessage = await message.channel.send({
       embeds: [
-        new EmbedBuilder()
-          .setColor(0x0046ff)
-          .setAuthor({
-            name: message.author.username,
-            iconURL: message.author.avatarURL() ?? undefined,
-          })
-          .addFields([
-            {
-              name: "Status",
-              value: "Oczekująca",
-            },
-            {
-              name: "Treść",
-              value: message.content,
-            },
-          ])
-          .setTimestamp(),
+        createSuggestionEmbed({
+          authorAvatar: message.author.avatarURL() ?? "",
+          authorName: message.author.username,
+          content: message.content,
+          priority: SuggestionPriority.Medium,
+          status: SuggestionStatus.Pending,
+          timestamp: Date.now(),
+        }),
       ],
     });
 

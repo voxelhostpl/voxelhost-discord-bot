@@ -19,8 +19,8 @@ import knex, { Knex } from "knex";
 import sqlite from "sqlite3";
 
 export class Database {
-  db: sqlite.Database;
-  knex: Knex;
+  private readonly db: sqlite.Database;
+  public readonly knex: Knex;
 
   constructor(path: string) {
     this.knex = knex({

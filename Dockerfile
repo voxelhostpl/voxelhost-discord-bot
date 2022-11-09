@@ -28,8 +28,8 @@ EXPOSE 80/tcp
 ENTRYPOINT [ "/sbin/tini", "--" ]
 CMD [ "node", "dist/main.js" ]
 
-COPY --from=builder dist dist
-COPY --from=builder migrations migrations
+COPY --from=builder dist/src dist
+COPY --from=builder dist/migrations migrations
 COPY utility-commands utility-commands
 COPY .env .
 COPY --from=production_dependencies node_modules node_modules

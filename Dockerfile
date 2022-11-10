@@ -16,7 +16,7 @@ RUN yarn install --production --frozen-lockfile
 
 
 
-FROM alpine:3 AS production
+FROM alpine:20221110 AS production
 
 RUN apk add --no-cache nodejs tini
 

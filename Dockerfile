@@ -1,4 +1,4 @@
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 COPY package.json yarn.lock ./
 RUN yarn install --frozen-lockfile
@@ -9,7 +9,7 @@ RUN yarn build
 
 
 
-FROM node:18-alpine AS production_dependencies
+FROM node:20-alpine AS production_dependencies
 
 COPY package.json yarn.lock ./
 RUN yarn install --production --frozen-lockfile

@@ -1,0 +1,11 @@
+## Diagnozowanie przyczyny lagów
+
+Aby zdiagnozować problemy z wydajnością serwera, możemy użyć Sparka.
+
+Podstawowy poradnik używania Sparka:
+
+1. Zainstaluj Sparka na swoim serwerze - pobierz odpowiedni dla wersji serwera i silnika plik .jar ze strony <https://spark.lucko.me/download>, oraz umieść go w folderze `plugins` lub `mods` w przypadku serwerów na modach
+
+2. Zrestartuj swój serwer aby załadować Sparka. Spark rozpocznie profilowanie w tle automatycznie.
+
+3. Kiedy doświadczysz lagów, wpisz na czacie lub w konsoli serwera komendę `/spark profiler stop`. Na czacie otrzymasz link do wyników profilowania, wyślij ten link abyśmy mogli pomóc w diagnozowaniu przyczyny lagów.
